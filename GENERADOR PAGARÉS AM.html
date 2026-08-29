@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Generador de Pagarés — Automotriz Mérida</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --ink:#14202e;
+    --ink-soft:#3c4a5a;
+    --ink-faint:#8592a1;
+    --line:#d8dee5;
+    --panel:#eef1f4;
+    --panel-2:#ffffff;
+    --accent:#1f3b57;
+    --accent-hover:#183049;
+    --paper:#ffffff;
+    --radius:10px;
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--panel);color:var(--ink);height:100%;}
+
+  /* ===== App shell: sidebar fijo + área de pagarés con scroll propio ===== */
+  .app{display:flex;height:100vh;overflow:hidden;}
+  @media (max-width:980px){.app{display:block;height:auto;overflow:visible;}}
+
+  .sidebar{
+    width:360px;flex:0 0 360px;
+    background:var(--panel-2);
+    border-right:1px solid var(--line);
+    padding:22px 22px 90px 22px;
+    overflow-y:auto;
+    height:100vh;
+  }
+  @media (max-width:980px){
+    .sidebar{width:100%;flex:none;height:auto;border-right:none;border-bottom:1px solid var(--line);position:relative;}
+  }
+
+  .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}
+  .brand .mark{font-weight:800;font-size:15px;letter-spacing:.06em;color:var(--accent);}
+  .brand .sub{font-size:12px;color:var(--ink-soft);}
+  h1{font-size:19px;margin:2px 0 22px 0;font-weight:700;letter-spacing:-0.01em;}
+
+  fieldset{border:none;padding:0;margin:0 0 22px 0;}
+  legend{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700;margin-bottom:10px;padding:0;}
+
+  label{display:block;font-size:12.5px;color:var(--ink-soft);margin:12px 0 4px 0;font-weight:600;}
+  label.first{margin-top:0;}
+  input[type=text],input[type=number],input[type=date]{
+    width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:7px;
+    font-size:13.5px;color:var(--ink);background:#fff;
+  }
+  input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  .toggle{
+    display:flex;align-items:center;gap:9px;margin:12px 0 2px 0;
+    padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:#fbfcfd;cursor:pointer;
+  }
+  .toggle input{width:16px;height:16px;accent-color:var(--accent);}
+  .toggle span{font-size:13px;font-weight:600;color:var(--ink);}
+
+  .aval-fields{transition:opacity .15s;}
+  .aval-fields.disabled{opacity:.35;pointer-events:none;}
+
+  .logo-upload{
+    display:flex;align-items:center;gap:10px;margin-top:6px;
+  }
+  .logo-upload .preview-box{
+    width:54px;height:54px;border:1px dashed var(--line);border-radius:7px;
+    display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fafbfc;flex-shrink:0;
+  }
+  .logo-upload .preview-box img{max-width:100%;max-height:100%;}
+  .logo-upload button{
+    font-size:12px;padding:7px 10px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;
+  }
+  .logo-upload input[type=file]{display:none;}
+
+  .helptext{font-size:11.5px;color:var(--ink-faint);margin-top:6px;line-height:1.4;}
+
+  .cta{
+    width:100%;padding:12px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;
+    font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;letter-spacing:.01em;
+  }
+  .cta:hover{background:var(--accent-hover);}
+  .cta.secondary{background:#fff;color:var(--accent);border:1.5px solid var(--accent);}
+  .cta.secondary:hover{background:#f2f6fa;}
+
+  .count-badge{
+    display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);
+    background:var(--panel);border-radius:20px;padding:5px 12px;margin-top:14px;font-weight:600;
+  }
+  .count-badge b{color:var(--accent);font-size:13px;}
+
+  /* ===== Main / preview (columna con su propio scroll) ===== */
+  .main{flex:1 1 auto;height:100vh;overflow-y:auto;padding:0 26px 80px 26px;}
+  @media (max-width:980px){.main{height:auto;overflow:visible;}}
+
+  /* toolbar + pestañas van juntas en un encabezado pegajoso para que
+     nunca se pierdan al hacer scroll por los pagarés */
+  .sticky-head{
+    position:sticky;top:0;z-index:5;background:var(--panel);
+    padding:26px 0 14px 0;margin-bottom:6px;
+  }
+
+  .toolbar{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+  .toolbar h2{font-size:15px;margin:0;color:var(--ink-soft);font-weight:600;}
+  .toolbar .actions{display:flex;gap:10px;}
+  .toolbar button{
+    padding:9px 16px;border-radius:7px;border:1px solid var(--line);background:#fff;font-size:13px;
+    font-weight:600;cursor:pointer;color:var(--ink);
+  }
+  .toolbar button.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .toolbar button.primary:hover{background:var(--accent-hover);}
+
+  .tabs{
+    display:flex;flex-wrap:wrap;gap:6px;max-height:110px;overflow-y:auto;
+    padding:10px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+  }
+  .tab{
+    font-size:12px;font-weight:700;padding:5px 10px;border-radius:5px;border:1px solid var(--line);
+    background:#fff;color:var(--ink-soft);cursor:pointer;
+  }
+  .tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+  /* ===== The sheet (pagaré) ===== */
+  .sheet-wrap{display:flex;flex-direction:column;align-items:center;padding-top:8px;}
+  .sheet{
+    width:816px;min-height:1056px;background:var(--paper);
+    box-shadow:0 4px 24px rgba(20,32,46,.14), 0 1px 2px rgba(20,32,46,.08);
+    padding:70px 76px;
+    font-family:Arial, Helvetica, sans-serif;
+    color:#111;
+    position:relative;
+  }
+  .sheet + .sheet{margin-top:34px;}
+
+  .doc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:46px;}
+  .doc-logo{display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
+  .doc-logo img{max-height:64px;max-width:170px;object-fit:contain;}
+  .doc-logo .logo-fallback{display:flex;flex-direction:column;line-height:1;}
+  .doc-logo .logo-fallback .am{font-size:30px;font-weight:900;letter-spacing:-1px;}
+  .doc-logo .logo-fallback .tag{font-size:9px;letter-spacing:.14em;font-weight:700;margin-top:2px;}
+  .doc-pagnum{font-size:13px;font-weight:700;letter-spacing:.02em;padding-top:6px;}
+
+  .doc-buenoblock{text-align:right;margin-bottom:34px;font-size:13px;line-height:1.55;}
+  .doc-buenoblock .bueno{font-weight:700;}
+
+  .doc-para{font-size:13px;line-height:1.7;text-align:justify;margin-bottom:20px;}
+
+  .doc-signblock{margin-top:52px;text-align:center;}
+  .doc-signblock .label{font-size:13px;font-weight:700;margin-bottom:46px;}
+  .doc-signblock .sigline{
+    width:340px;margin:0 auto;border-top:1px solid #111;padding-top:8px;
+  }
+  .doc-signblock .name{font-size:12.5px;font-weight:700;}
+  .doc-signblock .curp{font-size:12px;margin-top:2px;}
+  .doc-signblock .addr{font-size:12px;margin-top:2px;line-height:1.4;}
+
+  .doc-aval{margin-top:56px;}
+
+  /* ===== Impresión / PDF =====
+     Clave: liberar cualquier overflow/altura fija de .app y .main, porque un
+     contenedor con scroll interno solo imprime lo que está visible en pantalla. */
+  @media print{
+    @page{ size: letter; margin: 0; }
+    html,body{background:#fff;height:auto;}
+    .app{display:block !important;height:auto !important;overflow:visible !important;}
+    .sidebar,.sticky-head{display:none !important;}
+    .main{
+      height:auto !important;overflow:visible !important;
+      padding:0 !important;width:100%;
+    }
+    .sheet-wrap{display:block;align-items:initial;padding-top:0;}
+    .sheet{
+      box-shadow:none;
+      width:8.5in;min-height:11in;
+      padding:0.75in 0.85in;
+      margin:0 auto !important;
+      page-break-after:always;
+      break-after:page;
+    }
+    .sheet:last-child{page-break-after:auto;break-after:auto;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ============ SIDEBAR / FORM ============ -->
+  <div class="sidebar">
+    <div class="brand"><span class="mark">AUTOMOTRIZ MÉRIDA</span></div>
+    <h1>Generador de pagarés</h1>
+
+    <fieldset>
+      <legend>Logotipo</legend>
+      <div class="logo-upload">
+        <div class="preview-box" id="logoPreviewBox"><span style="font-size:9px;color:#aab3bd;">sin logo</span></div>
+        <button type="button" id="btnLogo">Subir logo</button>
+        <input type="file" id="logoInput" accept="image/*">
+      </div>
+      <div class="helptext">Opcional. Si no subes una imagen se usa un logotipo de texto genérico.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Acreedor</legend>
+      <label class="first">Nombre del acreedor</label>
+      <input type="text" id="acreedor" placeholder="Escribe texto">
+    </fieldset>
+
+    <fieldset>
+      <legend>Deudor</legend>
+      <label class="first">Nombre del deudor</label>
+      <input type="text" id="deudorNombre" placeholder="Escribe texto">
+      <label>CURP</label>
+      <input type="text" id="deudorCurp" placeholder="Escribe texto">
+      <label>Dirección</label>
+      <input type="text" id="deudorDireccion" placeholder="Escribe texto">
+    </fieldset>
+
+    <fieldset>
+      <legend>Aval</legend>
+      <div class="toggle" id="avalToggleWrap">
+        <input type="checkbox" id="incluirAval" checked>
+        <span>Incluir aval en el documento</span>
+      </div>
+      <div class="aval-fields" id="avalFields">
+        <label class="first">Nombre del aval</label>
+        <input type="text" id="avalNombre" placeholder="Escribe texto">
+        <label>CURP</label>
+        <input type="text" id="avalCurp" placeholder="Escribe texto">
+        <label>Dirección</label>
+        <input type="text" id="avalDireccion" placeholder="Escribe texto">
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Condiciones del pagaré</legend>
+      <label class="first">Ciudad de celebración / pago</label>
+      <input type="text" id="ciudad" placeholder="Escribe texto">
+      <label>Fecha de celebración</label>
+      <input type="date" id="fechaCelebracion">
+      <div class="row2">
+        <div>
+          <label>Monto por pagaré (MXN)</label>
+          <input type="number" id="monto" placeholder="0.00" step="0.01" min="0">
+        </div>
+        <div>
+          <label>Interés moratorio (%)</label>
+          <input type="number" id="interes" value="5" step="0.1" min="0">
+        </div>
+      </div>
+      <label>Número de pagarés (meses)</label>
+      <input type="number" id="numPagares" value="24" min="1" max="120">
+      <div class="helptext">El vencimiento de cada pagaré cae exactamente un mes después del anterior, tomando como base la fecha de celebración.</div>
+    </fieldset>
+
+    <button class="cta" id="btnGenerar">Generar pagarés</button>
+    <button class="cta secondary" id="btnImprimir" style="margin-top:10px;">Imprimir / Guardar como PDF</button>
+
+    <div class="count-badge">Pagarés generados: <b id="countBadge">0</b></div>
+  </div>
+
+  <!-- ============ MAIN / PREVIEW ============ -->
+  <div class="main">
+    <div class="sticky-head">
+      <div class="toolbar">
+        <h2>Previsualización — se actualiza al presionar «Generar pagarés»</h2>
+        <div class="actions">
+          <button id="btnScrollTop">Ir al inicio</button>
+          <button class="primary" id="btnImprimir2">Imprimir / PDF</button>
+        </div>
+      </div>
+      <div class="tabs" id="tabs"></div>
+    </div>
+    <div class="sheet-wrap" id="sheetWrap">
+      <div class="sheet" style="display:flex;align-items:center;justify-content:center;color:#9aa3ac;font-size:14px;">
+        Completa los datos y presiona «Generar pagarés» para ver la previsualización.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Utilidades de fecha en español ---------- */
+const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function addMonthsClamped(date, n){
+  const d = new Date(date.getTime());
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n);
+  const lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
+  return d;
+}
+
+function fechaCelebracionLarga(date){
+  // "martes, 25 de agosto de 2026"
+  const dia = DIAS[date.getDay()];
+  return `${dia}, ${date.getDate()} de ${MESES[date.getMonth()]} de ${date.getFullYear()}`;
+}
+
+function fechaVencimientoDoc(date){
+  // "25 SEPTIEMBRE DEL 2026"
+  return `${date.getDate()} ${MESES[date.getMonth()].toUpperCase()} DEL ${date.getFullYear()}`;
+}
+
+/* ---------- Número a letras (pesos MXN) ---------- */
+const UNIDADES = ['', 'un', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+const DECENAS = ['diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve'];
+const DECENAS2 = ['', '', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+const CENTENAS = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+
+const VEINTES = ['veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+
+function convertirGrupo(n){
+  let out = '';
+  if(n == 100) return 'cien';
+  const c = Math.floor(n/100), r = n%100;
+  if(c>0) out += CENTENAS[c] + ' ';
+  if(r >= 10 && r < 20){ out += DECENAS[r-10]; }
+  else if(r >= 20 && r < 30){ out += VEINTES[r-20]; }
+  else{
+    const d = Math.floor(r/10), u = r%10;
+    if(d >= 3){
+      out += DECENAS2[d];
+      if(u>0) out += ' y ' + UNIDADES[u];
+    } else if (u>0){
+      out += UNIDADES[u];
+    }
+  }
+  return out.trim();
+}
+
+function apocopar(str){
+  // "veintiuno" -> "veintiún", "...uno" (al final, precedido de espacio) -> "...un"
+  return str.replace(/veintiuno$/, 'veintiún').replace(/(^|\s)uno$/, '$1un');
+}
+
+function numeroALetras(n){
+  n = Math.floor(n);
+  if(n === 0) return 'cero';
+  if(n === 1) return 'un';
+  let out = '';
+  const millones = Math.floor(n/1000000);
+  const miles = Math.floor((n%1000000)/1000);
+  const resto = n%1000;
+
+  if(millones>0){
+    out += (millones===1 ? 'un millón ' : apocopar(convertirGrupo(millones)) + ' millones ');
+  }
+  if(miles>0){
+    out += (miles===1 ? 'mil ' : apocopar(convertirGrupo(miles)) + ' mil ');
+  }
+  if(resto>0){
+    out += convertirGrupo(resto);
+  }
+  return out.trim();
+}
+
+function montoEnLetras(monto){
+  const entero = Math.floor(monto);
+  const centavos = Math.round((monto - entero) * 100);
+  const letras = numeroALetras(entero).toUpperCase();
+  const cent = String(centavos).padStart(2,'0');
+  const pesoLabel = entero === 1 ? 'PESO' : 'PESOS';
+  return `${letras} ${pesoLabel} ${cent}/100 M.N.`;
+}
+
+function formatoMoneda(monto){
+  return '$' + monto.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+/* ---------- Estado / logo ---------- */
+let logoDataUrl = null;
+const logoInput = document.getElementById('logoInput');
+const btnLogo = document.getElementById('btnLogo');
+const logoPreviewBox = document.getElementById('logoPreviewBox');
+
+btnLogo.addEventListener('click', () => logoInput.click());
+logoInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    logoDataUrl = ev.target.result;
+    logoPreviewBox.innerHTML = `<img src="${logoDataUrl}" alt="logo">`;
+  };
+  reader.readAsDataURL(file);
+});
+
+/* ---------- Aval toggle ---------- */
+const incluirAval = document.getElementById('incluirAval');
+const avalFields = document.getElementById('avalFields');
+incluirAval.addEventListener('change', () => {
+  avalFields.classList.toggle('disabled', !incluirAval.checked);
+});
+
+/* ---------- Fecha por defecto: hoy ---------- */
+const fechaCelebracionInput = document.getElementById('fechaCelebracion');
+(function setDefaultDate(){
+  const t = new Date();
+  const iso = t.toISOString().slice(0,10);
+  fechaCelebracionInput.value = iso;
+})();
+
+/* ---------- Generación ---------- */
+let pagares = [];
+
+function buildLogoHTML(){
+  if(logoDataUrl){
+    return `<img src="${logoDataUrl}" alt="logo">`;
+  }
+  return `<div class="logo-fallback">
+    <div class="am">AM</div>
+    <div class="tag">AUTOMOTRIZ&nbsp;MÉRIDA</div>
+  </div>`;
+}
+
+function generarPagares(){
+  const acreedor = document.getElementById('acreedor').value.trim().toUpperCase();
+  const dNombre = document.getElementById('deudorNombre').value.trim().toUpperCase();
+  const dCurp = document.getElementById('deudorCurp').value.trim().toUpperCase();
+  const dDireccion = document.getElementById('deudorDireccion').value.trim().toUpperCase();
+
+  const usaAval = incluirAval.checked;
+  const aNombre = document.getElementById('avalNombre').value.trim().toUpperCase();
+  const aCurp = document.getElementById('avalCurp').value.trim().toUpperCase();
+  const aDireccion = document.getElementById('avalDireccion').value.trim().toUpperCase();
+
+  const ciudad = document.getElementById('ciudad').value.trim().toUpperCase();
+  const fechaBase = new Date(fechaCelebracionInput.value + 'T00:00:00');
+  const monto = parseFloat(document.getElementById('monto').value) || 0;
+  const interes = parseFloat(document.getElementById('interes').value) || 0;
+  const total = parseInt(document.getElementById('numPagares').value) || 1;
+
+  const celebracionLarga = fechaCelebracionLarga(fechaBase);
+  const montoFmt = formatoMoneda(monto);
+  const montoLetras = montoEnLetras(monto);
+
+  pagares = [];
+  for(let i=1; i<=total; i++){
+    const vencimiento = addMonthsClamped(fechaBase, i);
+    pagares.push({
+      numero: i,
+      total,
+      acreedor, dNombre, dCurp, dDireccion,
+      usaAval, aNombre, aCurp, aDireccion,
+      ciudad, celebracionLarga,
+      vencimientoTxt: fechaVencimientoDoc(vencimiento),
+      montoFmt, montoLetras, interes
+    });
+  }
+  renderTabs();
+  renderSheets();
+  document.getElementById('countBadge').textContent = total;
+}
+
+function sheetHTML(p){
+  const avalBlock = p.usaAval ? `
+    <div class="doc-signblock doc-aval">
+      <div class="label">ACEPTO AVAL:</div>
+      <div class="sigline"></div>
+      <div class="name">${p.aNombre}</div>
+      <div class="curp">CURP: ${p.aCurp}</div>
+      <div class="addr">${p.aDireccion}</div>
+    </div>` : '';
+
+  return `
+  <div class="sheet" data-idx="${p.numero}">
+    <div class="doc-head">
+      <div class="doc-logo">${buildLogoHTML()}</div>
+      <div class="doc-pagnum">PAGARÉ ${String(p.numero).padStart(2,'0')}/${p.total}</div>
+    </div>
+
+    <div class="doc-buenoblock">
+      <div class="bueno">BUENO POR ${p.montoFmt}</div>
+      <div>EN ${p.ciudad} MÉXICO. A ${p.celebracionLarga.toUpperCase()}</div>
+    </div>
+
+    <div class="doc-para">
+      DEBO Y PAGARÉ INCONDICIONALMENTE POR ESTE PAGARÉ A LA ORDEN DEL SR. ${p.acreedor},
+      EN ${p.ciudad}, MÉXICO, EL DÍA ${p.vencimientoTxt}, LA CANTIDAD DE ${p.montoFmt}
+      (SON: ${p.montoLetras}), VALOR RECIBIDO A MI ENTERA SATISFACCIÓN, CAUSARÁ INTERÉS MORATORIO
+      AL TIPO ${p.interes}% MENSUAL, PAGADERO EN ESTA CIUDAD DE ${p.ciudad}, MÉXICO.
+    </div>
+
+    <div class="doc-para">
+      ESTE PAGARÉ FORMA PARTE DE UNA SERIE NUMERADA DE 01 AL ${p.total}, Y TODOS ESTÁN SUJETOS A LA
+      CONDICIÓN DE QUE, AL NO PAGARSE CUALQUIERA DE ELLOS A SU VENCIMIENTO, SERÁN EXIGIBLES TODOS
+      LOS QUE LE SIGAN EN NÚMERO, ADEMÁS DE LOS YA VENCIDOS.
+    </div>
+
+    <div class="doc-signblock">
+      <div class="label">ACEPTO DEUDOR:</div>
+      <div class="sigline"></div>
+      <div class="name">${p.dNombre}</div>
+      <div class="curp">CURP: ${p.dCurp}</div>
+      <div class="addr">${p.dDireccion}</div>
+    </div>
+
+    ${avalBlock}
+  </div>`;
+}
+
+function renderSheets(){
+  const wrap = document.getElementById('sheetWrap');
+  wrap.innerHTML = pagares.map(sheetHTML).join('');
+}
+
+function renderTabs(){
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = pagares.map(p =>
+    `<div class="tab" data-idx="${p.numero}">${String(p.numero).padStart(2,'0')}</div>`
+  ).join('');
+  tabs.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      const idx = t.getAttribute('data-idx');
+      const target = document.querySelector(`.sheet[data-idx="${idx}"]`);
+      if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
+}
+
+document.getElementById('btnGenerar').addEventListener('click', generarPagares);
+document.getElementById('btnImprimir').addEventListener('click', () => window.print());
+document.getElementById('btnImprimir2').addEventListener('click', () => window.print());
+document.getElementById('btnScrollTop').addEventListener('click', () => {
+  document.getElementById('sheetWrap').scrollIntoView({behavior:'smooth'});
+});
+
+/* Generar una vista inicial de ejemplo */
+generarPagares();
+</script>
+</body>
+</html>
